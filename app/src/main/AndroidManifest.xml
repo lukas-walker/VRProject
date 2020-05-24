@@ -21,6 +21,15 @@
         </activity>
 
         <meta-data android:name="com.google.ar.core" android:value="required" />
+
+        <meta-data android:name="com.google.android.gms.version" android:value="@integer/google_play_services_version" />
+
+        <meta-data
+            android:name="com.google.android.ar.API_KEY"
+            android:value="AIzaSyCSadrlXqlshcxGa0KV0n0yKwmJqiZnMTk"/>
+
     </application>
+
+
 
 </manifest>

@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "154376936272",
+    "firebase_url": "https://vrproject-4221c.firebaseio.com",
+    "project_id": "vrproject-4221c",
+    "storage_bucket": "vrproject-4221c.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:154376936272:android:d6b06430421d1ad56e6a55",
+        "android_client_info": {
+          "package_name": "com.android.vrproject"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "154376936272-0av3onhk8ghtpd5dk6iicsk00e9km5v5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvr5_8gKX79GwsvP1YTzYwhyNtTGoOFck"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "154376936272-0av3onhk8ghtpd5dk6iicsk00e9km5v5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
