@@ -12,7 +12,10 @@ import com.google.ar.core.Anchor;
 import com.google.ar.core.HitResult;
 import com.google.ar.core.Plane;
 import com.google.ar.sceneform.AnchorNode;
+import com.google.ar.sceneform.HitTestResult;
+import com.google.ar.sceneform.Node;
 import com.google.ar.sceneform.Scene;
+import com.google.ar.sceneform.math.Vector3;
 import com.google.ar.sceneform.rendering.ModelRenderable;
 import com.google.ar.sceneform.ux.ArFragment;
 import com.google.ar.sceneform.ux.TransformableNode;
@@ -31,7 +34,10 @@ public class MainActivity extends AppCompatActivity {
 
     private ModelRenderable modelRenderable;
     private AnchorNode anchorNode;
+    private TransformableNode lamp;
     private Scene arScene;
+    private AnchorData anchorData;
+    private int shortCode;
 
     private Button clearButton;
     private Button resolveButton;
@@ -43,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         cloudAnchorManager = new CloudAnchorManager();
-        firebaseManager = new FirebaseManager(this);
+        firebaseManager = new FirebaseManager(this, this);
 
         fragment = (CloudAnchorFragment)
                 getSupportFragmentManager().findFragmentById(R.id.sceneform_fragment);
@@ -90,16 +96,16 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        anchorData = new AnchorData();
+        anchorData.setPosition(new Vector3(0,0,0));
+        anchorData.setScale(new Vector3(1, 1, 1));
+
         // set new AnchorNode into the scene
         Anchor anchor = hitResult.createAnchor();
         anchorNode = new AnchorNode(anchor);
         anchorNode.setParent(fragment.getArSceneView().getScene());
 
-        // put Andy on the anchor
-        TransformableNode lamp = new TransformableNode(fragment.getTransformationSystem());
-        lamp.setParent(anchorNode);
-        lamp.setRenderable(modelRenderable);
-        lamp.select();
+        initAndy();
 
         cloudAnchorManager.hostCloudAnchor(
                 fragment.getArSceneView().getSession(), anchor, this::onHostedAnchorAvailable);
@@ -118,6 +124,8 @@ public class MainActivity extends AppCompatActivity {
 
     // show resolve dialog, ask for CloudAnchor ID, then call onShortCodeEntered
     private void onResolveButtonPressed() {
+
+
         ResolveDialogFragment dialog = ResolveDialogFragment.createWithOkListener(
                 this::onShortCodeEntered);;
         dialog.show(fragment.getFragmentManager(), "Resolve");
@@ -129,7 +137,7 @@ public class MainActivity extends AppCompatActivity {
             // reset pressed
             if (anchorNode != null) {
                 arScene.removeChild(anchorNode);
-                anchorNode = null;
+                //anchorNode = null;
             }
             return;
         }
@@ -137,11 +145,8 @@ public class MainActivity extends AppCompatActivity {
         anchorNode = new AnchorNode(anchor);
         anchorNode.setParent(fragment.getArSceneView().getScene());
 
-        // put Andy on the anchor
-        TransformableNode lamp = new TransformableNode(fragment.getTransformationSystem());
-        lamp.setParent(anchorNode);
-        lamp.setRenderable(modelRenderable);
-        lamp.select();
+        initAndy();
+        updateAndy();
 
     }
 
@@ -156,7 +161,8 @@ public class MainActivity extends AppCompatActivity {
             String cloudAnchorId = anchor.getCloudAnchorId();
             firebaseManager.nextShortCode(shortCode -> {
                 if (shortCode != null) {
-                    firebaseManager.storeUsingShortCode(shortCode, cloudAnchorId);
+                    anchorData.setCloudAnchorId(cloudAnchorId);
+                    firebaseManager.storeUsingShortCode(shortCode, anchorData);
                     infoText.setText("Cloud Anchor Hosted. Short code: " + shortCode);
                 } else {
                     // Firebase could not provide a short code.
@@ -169,6 +175,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private synchronized void onShortCodeEntered(int shortCode) {
+
+        // clear pending listeners
+        cloudAnchorManager.clearListeners();
+
+        // Clear the anchor from the scene.
+        updateAnchor(null);
+
+        this.shortCode = shortCode;
 
         infoText.setText("onShortCodeEntered was called");
 
@@ -188,15 +202,42 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private synchronized void onResolvedAnchorAvailable(Anchor anchor, int shortCode) {
+        this.shortCode = shortCode;
+
         Anchor.CloudAnchorState cloudState = anchor.getCloudAnchorState();
         if (cloudState == Anchor.CloudAnchorState.SUCCESS) {
             infoText.setText("Cloud Anchor Resolved. Short code: " + shortCode);
-            //snackbarHelper.showMessage(getActivity(), "Cloud Anchor Resolved. Short code: " + shortCode);
             updateAnchor(anchor);
         } else {
             infoText.setText("Error while resolving anchor with short code "+shortCode+". Error: " + cloudState.toString());
-
         }
+    }
+
+    public void setAnchorData(AnchorData anchorData){
+        this.anchorData = anchorData;
+        updateAndy();
+    }
+
+    public void initAndy(){
+        // put Andy on the anchor
+        lamp = new TransformableNode(fragment.getTransformationSystem());
+
+        lamp.getScaleController().setMinScale(0.2f);
+        lamp.getScaleController().setMaxScale(5f);
+
+        lamp.setParent(anchorNode);
+        lamp.setRenderable(modelRenderable);
+        lamp.select();
+        lamp.setOnTapListener((hitTestResult, motionEvent) -> {
+            anchorData.setPosition(lamp.getWorldPosition());
+            anchorData.setScale(lamp.getWorldScale());
+            firebaseManager.updateAnchorData(shortCode, anchorData);
+        });
+    }
+
+    public void updateAndy() {
+        lamp.setWorldPosition(anchorData.getPosition());
+        lamp.setWorldScale(anchorData.getScale());
     }
 }
 
