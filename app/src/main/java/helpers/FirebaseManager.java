@@ -19,6 +19,9 @@ package helpers;
 import android.content.Context;
 import android.util.Log;
 
+import com.android.vrproject.NodeData;
+import com.android.vrproject.MainActivity;
+import com.android.vrproject.SceneData;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -27,6 +30,9 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.MutableData;
 import com.google.firebase.database.Transaction;
 import com.google.firebase.database.ValueEventListener;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /** Helper class for Firebase storage of cloud anchor IDs. */
 public class FirebaseManager {
@@ -47,12 +53,16 @@ public class FirebaseManager {
   private static final String KEY_PREFIX = "anchor;";
   private static final int INITIAL_SHORT_CODE = 142;
   private final DatabaseReference rootRef;
+  private DatabaseReference anchorRef;
+  private MainActivity activity;
 
   /** Constructor that initializes the Firebase connection. */
-  public FirebaseManager(Context context) {
+  public FirebaseManager(Context context, MainActivity activity) {
     FirebaseApp firebaseApp = FirebaseApp.initializeApp(context);
     rootRef = FirebaseDatabase.getInstance(firebaseApp).getReference().child(KEY_ROOT_DIR);
     DatabaseReference.goOnline();
+
+    this.activity = activity;
   }
 
   /** Gets a new short code that can be used to store the anchor ID. */
@@ -88,8 +98,8 @@ public class FirebaseManager {
   }
 
   /** Stores the cloud anchor ID in the configured Firebase Database. */
-  public void storeUsingShortCode(int shortCode, String cloudAnchorId) {
-    rootRef.child(KEY_PREFIX + shortCode).setValue(cloudAnchorId);
+  public void storeUsingShortCode(int shortCode, SceneData sceneData) {
+    rootRef.child(KEY_PREFIX + shortCode).setValue(sceneData);
   }
 
   /**
@@ -97,24 +107,52 @@ public class FirebaseManager {
    * was not stored for this short code.
    */
   public void getCloudAnchorId(int shortCode, CloudAnchorIdListener listener) {
-    rootRef
-        .child(KEY_PREFIX + shortCode)
-        .addListenerForSingleValueEvent(
-            new ValueEventListener() {
-              @Override
-              public void onDataChange(DataSnapshot dataSnapshot) {
-                // Listener invoked when the data is successfully read from Firebase.
-                listener.onCloudAnchorIdAvailable(String.valueOf(dataSnapshot.getValue()));
-              }
+        anchorRef = rootRef.child(KEY_PREFIX + shortCode);
+        anchorRef.addListenerForSingleValueEvent(
+              new ValueEventListener() {
+                  @Override
+                  public void onDataChange(DataSnapshot dataSnapshot) {
+                      // Listener invoked when the data is successfully read from Firebase.
+                      SceneData sceneData = dataSnapshot.getValue(SceneData.class);
+                      listener.onCloudAnchorIdAvailable(sceneData.getCloudAnchorId());
 
-              @Override
-              public void onCancelled(DatabaseError error) {
-                Log.e(
-                    TAG,
-                    "The Firebase operation for getCloudAnchorId was cancelled.",
-                    error.toException());
-                listener.onCloudAnchorIdAvailable(null);
-              }
-            });
+                      Log.e("CLOUDID_NULL", "getCloudAnchorId(): "+sceneData.getCloudAnchorId());
+                      activity.setSceneData(sceneData);
+                  }
+
+                  @Override
+                  public void onCancelled(DatabaseError error) {
+                      Log.e(
+                              TAG,
+                              "The Firebase operation for getCloudAnchorId was cancelled.",
+                              error.toException());
+                      listener.onCloudAnchorIdAvailable(null);
+                  }
+              });
+        anchorRef.addValueEventListener(new ValueEventListener() {
+          @Override
+          public void onDataChange(DataSnapshot dataSnapshot) {
+              SceneData sceneData = dataSnapshot.getValue(SceneData.class);
+              Log.e("CLOUDID_NULL", "anchorRef.addValueEventListener: "+sceneData.getCloudAnchorId());
+              activity.setSceneData(sceneData);
+          }
+
+          @Override
+          public void onCancelled(DatabaseError databaseError) {
+              System.out.println("The read failed: " + databaseError.getCode());
+          }
+      });
+
+  }
+
+  public void updateSceneData(int shortCode, SceneData sceneData){
+      Log.e("UPDATE", "called"+shortCode);
+
+
+      Log.e("CLOUDID_NULL", "updateSceneData: "+sceneData.getCloudAnchorId());
+
+      Map<String, Object> updates = new HashMap<>();
+      updates.put(KEY_PREFIX + shortCode, sceneData);
+      rootRef.updateChildren(updates);
   }
 }

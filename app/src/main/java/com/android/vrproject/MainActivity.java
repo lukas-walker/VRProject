@@ -1,8 +1,10 @@
 package com.android.vrproject;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
@@ -13,14 +15,12 @@ import com.google.ar.core.HitResult;
 import com.google.ar.core.Plane;
 import com.google.ar.sceneform.AnchorNode;
 import com.google.ar.sceneform.HitTestResult;
-import com.google.ar.sceneform.Node;
 import com.google.ar.sceneform.Scene;
-import com.google.ar.sceneform.math.Vector3;
 import com.google.ar.sceneform.rendering.ModelRenderable;
-import com.google.ar.sceneform.ux.ArFragment;
 import com.google.ar.sceneform.ux.TransformableNode;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import helpers.CloudAnchorManager;
 import helpers.FirebaseManager;
@@ -34,9 +34,9 @@ public class MainActivity extends AppCompatActivity {
 
     private ModelRenderable modelRenderable;
     private AnchorNode anchorNode;
-    private TransformableNode lamp;
+    private Map<Integer, TransformableNode> transformableNodeMap;
     private Scene arScene;
-    private AnchorData anchorData;
+    private SceneData sceneData;
     private int shortCode;
 
     private Button clearButton;
@@ -56,6 +56,8 @@ public class MainActivity extends AppCompatActivity {
 
         arScene = fragment.getArSceneView().getScene();
         arScene.addOnUpdateListener(frameTime -> cloudAnchorManager.onUpdate());
+
+        transformableNodeMap = new HashMap<>();
 
         ModelRenderable.builder()
                 .setSource(this, R.raw.andy)
@@ -86,6 +88,7 @@ public class MainActivity extends AppCompatActivity {
     private void createNewCloudAnchor(HitResult hitResult) {
 
         infoText.setText("Plane tapped");
+
         // renderable not yet loaded
         if (modelRenderable == null){
             return;
@@ -93,24 +96,44 @@ public class MainActivity extends AppCompatActivity {
 
         if (anchorNode != null) {
             // Do nothing if there was already an anchor in the Scene.
+
+            int index = sceneData.addNew();
+            TransformableNode node = new TransformableNode(fragment.getTransformationSystem());
+            transformableNodeMap.put(index, node);
+
+            initObject(index);
+            updateObjects();
+
             return;
         }
 
-        anchorData = new AnchorData();
-        anchorData.setPosition(new Vector3(0,0,0));
-        anchorData.setScale(new Vector3(1, 1, 1));
+        sceneData = new SceneData();
+        sceneData.setNodeDataMap(new HashMap<>());
 
         // set new AnchorNode into the scene
         Anchor anchor = hitResult.createAnchor();
         anchorNode = new AnchorNode(anchor);
         anchorNode.setParent(fragment.getArSceneView().getScene());
 
-        initAndy();
+        // add new node and nodeData to Scene
+        int index = sceneData.addNew();
+        TransformableNode node = new TransformableNode(fragment.getTransformationSystem());
+        transformableNodeMap.put(index, node);
+
+        initObject(index);
+        updateObjects();
 
         cloudAnchorManager.hostCloudAnchor(
                 fragment.getArSceneView().getSession(), anchor, this::onHostedAnchorAvailable);
     }
 
+    public int getShortCode(){
+        return  shortCode;
+    }
+
+    public void setShortCode(int shortCode){
+        this.shortCode = shortCode;
+    }
 
     private void onClearButtonPressed() {
         infoText.setText("cleared");
@@ -118,14 +141,14 @@ public class MainActivity extends AppCompatActivity {
         // clear pending listeners
         cloudAnchorManager.clearListeners();
 
+        shortCode = 0;
+
         // Clear the anchor from the scene.
         updateAnchor(null);
     }
 
     // show resolve dialog, ask for CloudAnchor ID, then call onShortCodeEntered
     private void onResolveButtonPressed() {
-
-
         ResolveDialogFragment dialog = ResolveDialogFragment.createWithOkListener(
                 this::onShortCodeEntered);;
         dialog.show(fragment.getFragmentManager(), "Resolve");
@@ -137,17 +160,23 @@ public class MainActivity extends AppCompatActivity {
             // reset pressed
             if (anchorNode != null) {
                 arScene.removeChild(anchorNode);
-                //anchorNode = null;
+                anchorNode = null;
             }
+
             return;
         }
 
         anchorNode = new AnchorNode(anchor);
         anchorNode.setParent(fragment.getArSceneView().getScene());
 
-        initAndy();
-        updateAndy();
+        // sceneData is up todate, need to update TransformationNodeMap
+        transformableNodeMap = sceneData.getTransformableNodeMap(fragment.getTransformationSystem(), anchorNode, modelRenderable);
 
+        for (int index : transformableNodeMap.keySet()) {
+            initObject(index);
+        }
+
+        updateObjects();
     }
 
 
@@ -161,8 +190,9 @@ public class MainActivity extends AppCompatActivity {
             String cloudAnchorId = anchor.getCloudAnchorId();
             firebaseManager.nextShortCode(shortCode -> {
                 if (shortCode != null) {
-                    anchorData.setCloudAnchorId(cloudAnchorId);
-                    firebaseManager.storeUsingShortCode(shortCode, anchorData);
+                    setShortCode(shortCode);
+                    sceneData.setCloudAnchorId(cloudAnchorId);
+                    firebaseManager.storeUsingShortCode(shortCode, sceneData);
                     infoText.setText("Cloud Anchor Hosted. Short code: " + shortCode);
                 } else {
                     // Firebase could not provide a short code.
@@ -213,31 +243,99 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void setAnchorData(AnchorData anchorData){
-        this.anchorData = anchorData;
-        updateAndy();
+    public void setSceneData(SceneData sceneData){
+        this.sceneData = sceneData;
+        updateObjects();
     }
 
-    public void initAndy(){
+    public void initObject(int index){
         // put Andy on the anchor
-        lamp = new TransformableNode(fragment.getTransformationSystem());
+        TransformableNode node = transformableNodeMap.get(index);
+        NodeData nodeData = sceneData.getNodeData(index);
 
-        lamp.getScaleController().setMinScale(0.2f);
-        lamp.getScaleController().setMaxScale(5f);
+        node.setParent(anchorNode);
+        node.setRenderable(modelRenderable);
+        node.select();
 
-        lamp.setParent(anchorNode);
-        lamp.setRenderable(modelRenderable);
-        lamp.select();
-        lamp.setOnTapListener((hitTestResult, motionEvent) -> {
-            anchorData.setPosition(lamp.getWorldPosition());
-            anchorData.setScale(lamp.getWorldScale());
-            firebaseManager.updateAnchorData(shortCode, anchorData);
+        node.getScaleController().setMinScale(0.2f);
+        node.getScaleController().setMaxScale(5f);
+
+        /*node.setOnTapListener((hitTestResult, motionEvent) -> {
+            nodeData.setPosition(node.getWorldPosition());
+            nodeData.setScale(node.getWorldScale());
+            nodeData.setRotation(node.getWorldRotation());
+            sceneData.setNodeData(index, nodeData);
+        });
+
+         */
+
+        Log.e("UPDATE", "in initObject: "+shortCode);
+
+        node.setOnTouchListener((hitTestResult, event) -> {
+            Log.e("UPDATE", "in listener: "+shortCode);
+
+            nodeData.setPosition(node.getLocalPosition());
+            nodeData.setScale(node.getLocalScale());
+            nodeData.setRotation(node.getLocalRotation());
+            sceneData.setNodeData(index, nodeData);
+
+            if (event.getAction() == MotionEvent.ACTION_UP ) {
+                if (anchorNode != null) {
+                    firebaseManager.updateSceneData(getShortCode(), sceneData);
+                }
+            }
+            return true;
         });
     }
 
-    public void updateAndy() {
-        lamp.setWorldPosition(anchorData.getPosition());
-        lamp.setWorldScale(anchorData.getScale());
+    public void updateObjects() {
+
+        for (int index : transformableNodeMap.keySet()) {
+            Log.e("INDEX", ((Integer)index).toString());
+            NodeData nodeData = sceneData.getNodeData(index);
+            TransformableNode node = transformableNodeMap.get(index);
+
+            node.setLocalPosition(nodeData.getPosition());
+            node.setLocalScale(nodeData.getScale());
+            node.setLocalRotation(nodeData.getRotation());
+        }
     }
+
+/*
+    protected static ObjectAnimator createAnimator(boolean clockwise, float axisTiltDeg) {
+        // Node's setLocalRotation method accepts Quaternions as parameters.
+        // First, set up orientations that will animate a circle.
+        Quaternion[] orientations = new Quaternion[4];
+        // Rotation to apply first, to tilt its axis.
+        Quaternion baseOrientation = Quaternion.axisAngle(new Vector3(1.0f, 0f, 0.0f), axisTiltDeg);
+        for (int i = 0; i < orientations.length; i++) {
+            float angle = i * 360 / (float)(orientations.length - 1);
+            if (clockwise) {
+                angle = 360 - angle;
+            }
+            Quaternion orientation = Quaternion.axisAngle(new Vector3(0.0f, 1.0f, 0.0f), angle);
+            orientations[i] = Quaternion.multiply(baseOrientation, orientation);
+        }
+
+        ObjectAnimator orbitAnimation = new ObjectAnimator();
+        // Cast to Object[] to make sure the varargs overload is called.
+        orbitAnimation.setObjectValues((Object[]) orientations);
+
+        // Next, give it the localRotation property.
+        orbitAnimation.setPropertyName("localRotation");
+
+        // Use Sceneform's QuaternionEvaluator.
+        orbitAnimation.setEvaluator(new QuaternionEvaluator());
+
+        //  Allow orbitAnimation to repeat forever
+        orbitAnimation.setRepeatCount(ObjectAnimator.INFINITE);
+        orbitAnimation.setRepeatMode(ObjectAnimator.RESTART);
+        orbitAnimation.setInterpolator(new LinearInterpolator());
+        orbitAnimation.setAutoCancel(true);
+
+        return orbitAnimation;
+    }
+
+ */
 }
 
