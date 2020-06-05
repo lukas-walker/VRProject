@@ -147,8 +147,6 @@ public class FirebaseManager {
 
   public void updateSceneData(int shortCode, SceneData sceneData){
       Log.e("UPDATE", "called"+shortCode);
-
-
       Log.e("CLOUDID_NULL", "updateSceneData: "+sceneData.getCloudAnchorId());
 
       Map<String, Object> updates = new HashMap<>();

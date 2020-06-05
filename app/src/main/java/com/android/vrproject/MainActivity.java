@@ -1,11 +1,11 @@
 package com.android.vrproject;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.constraintlayout.widget.ConstraintLayout;
 
 import android.os.Bundle;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -14,7 +14,6 @@ import com.google.ar.core.Anchor;
 import com.google.ar.core.HitResult;
 import com.google.ar.core.Plane;
 import com.google.ar.sceneform.AnchorNode;
-import com.google.ar.sceneform.HitTestResult;
 import com.google.ar.sceneform.Node;
 import com.google.ar.sceneform.Scene;
 import com.google.ar.sceneform.math.Vector3;
@@ -23,6 +22,7 @@ import com.google.ar.sceneform.rendering.MaterialFactory;
 import com.google.ar.sceneform.rendering.ModelRenderable;
 import com.google.ar.sceneform.rendering.ShapeFactory;
 import com.google.ar.sceneform.ux.TransformableNode;
+import com.google.ar.sceneform.ux.TransformationSystem;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,26 +33,39 @@ import helpers.ResolveDialogFragment;
 
 public class MainActivity extends AppCompatActivity {
 
+    /* ARCORE AND HELPERS */
     private CloudAnchorFragment fragment;
     private CloudAnchorManager cloudAnchorManager;
     private FirebaseManager firebaseManager;
 
+    /* RENDERABLES */
     private ModelRenderable modelRenderable;
     private ModelRenderable anchorRedRenderable;
     private ModelRenderable anchorGreenRenderable;
 
+    /* NODES */
     private AnchorNode redAnchorNode;
-    private AnchorNode greenAnchorNode;
-    private Anchor anchor;
     private Anchor hostingAnchor;
-    private Map<Integer, TransformableNode> transformableNodeMap;
+
+    private AnchorNode mainAnchorNode;
+    private Anchor anchor;
+
+    /* SCENE */
+    private Map<Integer, myNode> myNodeMap;
     private Scene arScene;
     private SceneData sceneData;
     private int shortCode = 0;
 
+    /* BUTTONS AND VIEWS */
     private Button clearButton;
     private Button resolveButton;
     private TextView infoText;
+
+
+    /*
+    called initially when application is started
+    does all necessary preparation
+     */
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,6 +84,7 @@ public class MainActivity extends AppCompatActivity {
             if (anchor != null) Log.e("ANCHOR POSITION", anchor.getPose().toString());
         });
 
+        // build all necessary renderables
         ModelRenderable.builder()
                 .setSource(this, R.raw.andy)
                 .build()
@@ -80,14 +94,14 @@ public class MainActivity extends AppCompatActivity {
                 .thenAccept(
                         material -> {
                             anchorRedRenderable =
-                                    ShapeFactory.makeSphere(0.1f, new Vector3(0.0f, 0.0f, 0.0f), material); });
+                                    ShapeFactory.makeCylinder(0.01f, 0.001f, new Vector3(0.0f, 0.0f, 0.0f), material); });
 
 
-        MaterialFactory.makeOpaqueWithColor(this, new Color(android.graphics.Color.GREEN))
+        MaterialFactory.makeTransparentWithColor(this, new Color(android.graphics.Color.GREEN))
                 .thenAccept(
                         material -> {
                             anchorGreenRenderable =
-                                    ShapeFactory.makeSphere(0.1f, new Vector3(0.0f, 0.0f, 0.0f), material); });
+                                    ShapeFactory.makeCylinder(0.01f, 0.001f, new Vector3(0.0f, 0.0f, 0.0f), material); });
 
 
 
@@ -101,13 +115,16 @@ public class MainActivity extends AppCompatActivity {
                     else {
                         createNewCloudAnchor(hitresult);
                     }
+
+                    if (fragment.getTransformationSystem().getSelectedNode() instanceof myNode)
+                        updateFirebase(((myNode)fragment.getTransformationSystem().getSelectedNode()).getIndex());
                 }
         );
 
         sceneData = new SceneData();
         sceneData.setNodeDataMap(new HashMap<>());
 
-        transformableNodeMap = new HashMap<>();
+        myNodeMap = new HashMap<>();
 
         // initialize buttons
         View buttonPanel = findViewById(R.id.buttonPanel);
@@ -155,15 +172,12 @@ public class MainActivity extends AppCompatActivity {
 
         // add new object to this anchor
         int index = sceneData.addNew();
-        TransformableNode node = new TransformableNode(fragment.getTransformationSystem());
-        transformableNodeMap.put(index, node);
+        myNode node = new myNode(fragment.getTransformationSystem(), this, index);
+        myNodeMap.put(index, node);
 
         initObject(index);
 
-        if (anchor != null) {
-            firebaseManager.updateSceneData(getShortCode(), sceneData);
-            //updateMessages(node);
-        }
+        updateFirebase(index);
     }
 
 
@@ -175,7 +189,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void initObject(int index){
         // put Andy on the anchor
-        TransformableNode node = transformableNodeMap.get(index);
+        myNode node = myNodeMap.get(index);
         NodeData nodeData = sceneData.getNodeData(index);
 
         float[] anchorPosition = anchor.getPose().getTranslation();
@@ -183,7 +197,7 @@ public class MainActivity extends AppCompatActivity {
         //add new anchorNode right on top of original anchor --> can then be moved
         AnchorNode anchorNode = new AnchorNode();
         //anchorNode.setWorldPosition(new Vector3(anchorPosition[0], anchorPosition[1], anchorPosition[2]));
-        anchorNode.setParent(greenAnchorNode);//fragment.getArSceneView().getScene());
+        anchorNode.setParent(mainAnchorNode);//fragment.getArSceneView().getScene());
         anchorNode.setLocalPosition(new Vector3(0,0,0));
 
         node.setParent(anchorNode);
@@ -193,32 +207,32 @@ public class MainActivity extends AppCompatActivity {
         node.getScaleController().setMinScale(0.2f);
         node.getScaleController().setMaxScale(5f);
 
+        /*
         node.setOnTouchListener((hitTestResult, event) -> {
-            nodeData.setPosition(node.getParent().getLocalPosition());
-            //nodeData.setScale(node.getParent().getWorldScale());
-            //nodeData.setRotation(node.getParent().getWorldRotation());
-            sceneData.setNodeData(index, nodeData);
-
             if (event.getAction() == MotionEvent.ACTION_UP ) {
-                if (anchor != null) {
-                    firebaseManager.updateSceneData(getShortCode(), sceneData);
-                    //updateMessages(node);
-                }
+                updateFirebase(index);
             }
             return true;
         });
+
+         */
     }
 
 
     public void updateObjects() {
-        for (int index : transformableNodeMap.keySet()) {
+        for (int index : myNodeMap.keySet()) {
             Log.e("INDEX", ((Integer)index).toString());
             NodeData nodeData = sceneData.getNodeData(index);
-            TransformableNode node = transformableNodeMap.get(index);
+            myNode node = myNodeMap.get(index);
 
-            node.getParent().setLocalPosition(nodeData.getPosition());
-            //node.getParent().setWorldScale(nodeData.getScale());
-            //node.getParent().setWorldRotation(nodeData.getRotation());
+            //node.getParent().setLocalPosition(nodeData.getPosition());
+            //Node parent = node.getParent();
+            //node.setParent(null);
+            node.setLocalScale(nodeData.getScale());
+            node.getScaleController().onActivated(node); //solves problem?
+            //node.setParent(parent);
+            Log.e("SCALE",nodeData.getScale().toString());
+            //node.getParent().setLocalRotation(nodeData.getRotation());
         }
 
 
@@ -324,10 +338,10 @@ public class MainActivity extends AppCompatActivity {
         if (redAnchorNode != null) redAnchorNode.setParent(null);
 
         //set green ball on top of anchor
-        greenAnchorNode = new AnchorNode(this.anchor);
-        greenAnchorNode.setParent(fragment.getArSceneView().getScene());
+        mainAnchorNode = new AnchorNode(this.anchor);
+        mainAnchorNode.setParent(fragment.getArSceneView().getScene());
         Node node = new Node();
-        node.setParent(greenAnchorNode);
+        node.setParent(mainAnchorNode);
         node.setRenderable(anchorGreenRenderable);
 
         Anchor.CloudAnchorState cloudState = this.anchor.getCloudAnchorState();
@@ -336,9 +350,9 @@ public class MainActivity extends AppCompatActivity {
 
             // sceneData has been set according to newly resolved anchor
 
-            transformableNodeMap = sceneData.getTransformableNodeMap(fragment.getTransformationSystem());
+            myNodeMap = sceneData.getTransformableNodeMap(fragment.getTransformationSystem(), this);
 
-            for (int index : transformableNodeMap.keySet()) {
+            for (int index : myNodeMap.keySet()) {
                 initObject(index);
             }
 
@@ -378,16 +392,16 @@ public class MainActivity extends AppCompatActivity {
 
         shortCode = 0;
 
-        if (transformableNodeMap != null){
-            for( TransformableNode node : transformableNodeMap.values()){
+        if (myNodeMap != null){
+            for( TransformableNode node : myNodeMap.values()){
                 node.getParent().setParent(null); // remove all nodes from the scene
             }
         }
 
         // throw away the map
-        transformableNodeMap = new HashMap<>();
+        myNodeMap = new HashMap<>();
 
-        if (greenAnchorNode != null) greenAnchorNode.setParent(null);
+        if (mainAnchorNode != null) mainAnchorNode.setParent(null);
 
         anchor = null;
     }
@@ -407,6 +421,21 @@ public class MainActivity extends AppCompatActivity {
 
     public void setShortCode(int shortCode) {
         this.shortCode = shortCode;
+    }
+
+    public void updateFirebase(int index){
+        if (anchor != null) {
+            NodeData nodeData = sceneData.getNodeData(index);
+            myNode node = myNodeMap.get(index);
+
+            // update values
+            nodeData.setPosition(node.getParent().getLocalPosition());
+            nodeData.setScale(node.getLocalScale());
+            //nodeData.setRotation(node.getParent().getLocalRotation());
+            sceneData.setNodeData(index, nodeData);
+
+            firebaseManager.updateSceneData(getShortCode(), sceneData);
+        }
     }
 }
 

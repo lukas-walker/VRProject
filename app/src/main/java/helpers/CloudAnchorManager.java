@@ -16,10 +16,13 @@
 
 package helpers;
 
+import android.util.Log;
+
 import com.google.ar.core.Anchor;
 import com.google.ar.core.Anchor.CloudAnchorState;
 import com.google.ar.core.Session;
 
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -60,21 +63,26 @@ public class CloudAnchorManager {
 
   /** Should be called after a {@link Session#update()} call. */
   public synchronized void onUpdate() {
-    Iterator<Map.Entry<Anchor, CloudAnchorListener>> iter = pendingAnchors.entrySet().iterator();
-    while (iter.hasNext()) {
-      Map.Entry<Anchor, CloudAnchorListener> entry = iter.next();
-      Anchor anchor = entry.getKey();
-      if (isReturnableState(anchor.getCloudAnchorState())) {
-        CloudAnchorListener listener = entry.getValue();
-        listener.onCloudTaskComplete(anchor);
-        iter.remove();
+    try {
+      Iterator<Map.Entry<Anchor, CloudAnchorListener>> iter = pendingAnchors.entrySet().iterator();
+      while (iter.hasNext()) {
+        Map.Entry<Anchor, CloudAnchorListener> entry = iter.next();
+        Anchor anchor = entry.getKey();
+        if (isReturnableState(anchor.getCloudAnchorState())) {
+          CloudAnchorListener listener = entry.getValue();
+          listener.onCloudTaskComplete(anchor);
+          iter.remove();
+        }
       }
+    }
+    catch (ConcurrentModificationException e) {
+      // cleared listeners during this operation.. ignore...
     }
   }
 
   /** Used to clear any currently registered listeners, so they wont be called again. */
   public synchronized void clearListeners() {
-    pendingAnchors.clear();
+      pendingAnchors.clear();
   }
 
   private static boolean isReturnableState(CloudAnchorState cloudState) {

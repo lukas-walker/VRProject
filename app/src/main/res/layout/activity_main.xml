@@ -6,11 +6,13 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+
     <fragment
-        android:id="@+id/sceneform_fragment"
-        android:name="com.android.vrproject.CloudAnchorFragment"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+    android:id="@+id/sceneform_fragment"
+    android:name="com.android.vrproject.CloudAnchorFragment"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
+
 
     <LinearLayout
         android:id="@+id/buttonPanel"

@@ -19,11 +19,12 @@ public class SceneData {
 
     private static final String INDEX_PREFIX= "ID_";
 
-    private String cloudAnchorId;
-    private int index = 0;
-    private Map<String, NodeData> nodeDataMap;
+    public String cloudAnchorId;
+    public int index = 0;
+    public Map<String, NodeData> nodeDataMap;
 
     public SceneData(){
+        if (nodeDataMap==null) nodeDataMap = new HashMap<>();
     }
 
     public int add(NodeData nodeData){
@@ -32,7 +33,6 @@ public class SceneData {
     }
 
     public int addNew(){
-
         NodeData nodeData = new NodeData();
         nodeData.setPosition(new Vector3(0,0,0));
         nodeData.setScale(new Vector3(1, 1, 1));
@@ -43,22 +43,33 @@ public class SceneData {
     }
 
 
-    public Map<Integer, TransformableNode> getTransformableNodeMap(TransformationSystem transformationSystem, AnchorNode anchorNode, ModelRenderable modelRenderable){
-        Map<Integer, TransformableNode> transformableNodeMap = new HashMap<>();
+    public Map<Integer, myNode> getTransformableNodeMap(TransformationSystem transformationSystem, MainActivity activity){
+        Map<Integer, myNode> myNodeMap = new HashMap<>();
+
+        if (nodeDataMap == null) {
+            nodeDataMap = new HashMap<>();
+            return myNodeMap;
+        }
 
         for (String index : nodeDataMap.keySet()) {
-            NodeData nodeData = nodeDataMap.get(index);
             int i = Integer.parseInt(index.replace(INDEX_PREFIX, ""));
 
-            TransformableNode node = new TransformableNode(transformationSystem);
+            myNode node = new myNode(transformationSystem, activity, i);
 
-            transformableNodeMap.put(i, node);
+            myNodeMap.put(i, node);
         }
-        return transformableNodeMap;
+        return myNodeMap;
     }
+
+    public int getIndex(){
+        return index;
+    }
+
+    public void setIndex(int index){this.index = index;}
 
 
     public NodeData getNodeData(int index) {
+
         return nodeDataMap.get(INDEX_PREFIX +  ((Integer)index).toString());
     }
 
