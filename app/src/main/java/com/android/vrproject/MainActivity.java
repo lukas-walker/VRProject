@@ -116,8 +116,8 @@ public class MainActivity extends AppCompatActivity {
                         createNewCloudAnchor(hitresult);
                     }
 
-                    if (fragment.getTransformationSystem().getSelectedNode() instanceof myNode)
-                        updateFirebase(((myNode)fragment.getTransformationSystem().getSelectedNode()).getIndex());
+                    //if (fragment.getTransformationSystem().getSelectedNode() instanceof myNode)
+                    //    updateFirebase(((myNode)fragment.getTransformationSystem().getSelectedNode()).getIndex());
                 }
         );
 
@@ -225,7 +225,7 @@ public class MainActivity extends AppCompatActivity {
             NodeData nodeData = sceneData.getNodeData(index);
             myNode node = myNodeMap.get(index);
 
-            //node.getParent().setLocalPosition(nodeData.getPosition());
+            node.getParent().setLocalPosition(nodeData.getPosition());
             //Node parent = node.getParent();
             //node.setParent(null);
             node.setLocalScale(nodeData.getScale());
