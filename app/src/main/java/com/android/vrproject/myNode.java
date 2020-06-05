@@ -26,19 +26,13 @@ public class myNode extends TransformableNode {
     @Override
     public boolean onTouchEvent(HitTestResult hitTestResult, MotionEvent motionEvent) {
         Log.e("ACTVATED","touchevent");
-        if (motionEvent.getAction() == MotionEvent.ACTION_UP) activity.updateFirebase(index);
+        if (motionEvent.getAction() == MotionEvent.ACTION_UP) update();
 
         scaleDetector.onTouchEvent(motionEvent);
 
         return super.onTouchEvent(hitTestResult, motionEvent);
     }
 
-    @Override
-    public void onActivate() {
-        Log.e("ACTVATED","activated");
-        activity.updateFirebase(index);
-        super.onActivate();
-    }
 
     public void update(){
         activity.updateFirebase(index);
