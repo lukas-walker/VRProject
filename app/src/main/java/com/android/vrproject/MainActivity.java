@@ -232,7 +232,7 @@ public class MainActivity extends AppCompatActivity {
             node.getScaleController().onActivated(node); //solves problem?
             //node.setParent(parent);
             Log.e("SCALE",nodeData.getScale().toString());
-            //node.getParent().setLocalRotation(nodeData.getRotation());
+            node.setLocalRotation(nodeData.getRotation());
         }
 
 
@@ -431,7 +431,7 @@ public class MainActivity extends AppCompatActivity {
             // update values
             nodeData.setPosition(node.getParent().getLocalPosition());
             nodeData.setScale(node.getLocalScale());
-            //nodeData.setRotation(node.getParent().getLocalRotation());
+            nodeData.setRotation(node.getLocalRotation());
             sceneData.setNodeData(index, nodeData);
 
             firebaseManager.updateSceneData(getShortCode(), sceneData);
