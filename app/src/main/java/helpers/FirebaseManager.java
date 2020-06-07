@@ -19,7 +19,6 @@ package helpers;
 import android.content.Context;
 import android.util.Log;
 
-import com.android.vrproject.NodeData;
 import com.android.vrproject.MainActivity;
 import com.android.vrproject.SceneData;
 import com.google.firebase.FirebaseApp;

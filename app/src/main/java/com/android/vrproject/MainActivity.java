@@ -66,37 +66,41 @@ public class MainActivity extends AppCompatActivity {
     called initially when application is started
     does all necessary preparation
      */
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // Initialized helpers
         cloudAnchorManager = new CloudAnchorManager();
         firebaseManager = new FirebaseManager(this, this);
 
+        // Get the Fragment from the activity's layout (see res > layout > activity_main.xml
         fragment = (CloudAnchorFragment)
                 getSupportFragmentManager().findFragmentById(R.id.sceneform_fragment);
 
+        // handle listeners when Scene is updated
         arScene = fragment.getArSceneView().getScene();
         arScene.addOnUpdateListener(frameTime -> {
             cloudAnchorManager.onUpdate();
-            if (anchor != null) Log.e("ANCHOR POSITION", anchor.getPose().toString());
         });
 
         // build all necessary renderables
+
+        // Andy
         ModelRenderable.builder()
                 .setSource(this, R.raw.andy)
                 .build()
                 .thenAccept(modelRenderable -> this.modelRenderable = modelRenderable);
 
+        // Red dot
         MaterialFactory.makeOpaqueWithColor(this, new Color(android.graphics.Color.RED))
                 .thenAccept(
                         material -> {
                             anchorRedRenderable =
                                     ShapeFactory.makeCylinder(0.01f, 0.001f, new Vector3(0.0f, 0.0f, 0.0f), material); });
 
-
+        // Green dot
         MaterialFactory.makeTransparentWithColor(this, new Color(android.graphics.Color.GREEN))
                 .thenAccept(
                         material -> {
@@ -109,15 +113,13 @@ public class MainActivity extends AppCompatActivity {
         fragment.setOnTapArPlaneListener(
                 (HitResult hitresult, Plane plane, MotionEvent motionevent) -> {
                     if (anchor != null) {
-                        // either new anchor already created or old one already resolved
+                        // anchor was resolved --> add new object
                         addNewObject();
                     }
                     else {
+                        // no anchor yet --> create new one and host it.
                         createNewCloudAnchor(hitresult);
                     }
-
-                    //if (fragment.getTransformationSystem().getSelectedNode() instanceof myNode)
-                    //    updateFirebase(((myNode)fragment.getTransformationSystem().getSelectedNode()).getIndex());
                 }
         );
 
@@ -140,33 +142,36 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-
-
-
     /*
-    OBJECT FUNCTIONS
+    OBJECT MANIPULATING FUNCTIONS
      */
 
 
-
-
-
+    /*
+    creates new anchor and starts the hosting process
+     */
     private void createNewCloudAnchor(HitResult hitResult) {
         // set new AnchorNode into the scene
         hostingAnchor = hitResult.createAnchor();
+
+        // set red dot
         redAnchorNode = new AnchorNode(hostingAnchor);
         redAnchorNode.setParent(fragment.getArSceneView().getScene());
         Node node = new Node();
         node.setParent(redAnchorNode);
         node.setRenderable(anchorRedRenderable);
 
+        // host it
         cloudAnchorManager.hostCloudAnchor(
                 fragment.getArSceneView().getSession(), hostingAnchor, this::onHostedAnchorAvailable);
     }
 
+    /*
+    Adds a new object to the scene. If no anchor has been resolved, it does nothing
+     */
     public void addNewObject() {
         if (shortCode == 0) {
-            // not hosted yet --> wait
+            // not hosted yet --> do nothing
             return;
         }
 
@@ -177,16 +182,22 @@ public class MainActivity extends AppCompatActivity {
 
         initObject(index);
 
+        // update the cloud state of the scene
         updateFirebase(index);
     }
 
-
+    /*
+    This is called whenever the cloud state is changed. Updates the object in the scene
+     */
     public void setSceneData(SceneData sceneData){
         this.sceneData = sceneData;
 
         updateObjects();
     }
 
+    /*
+    initializes one object. The corresponding myNode object hast have already been initialized.
+     */
     public void initObject(int index){
         // put Andy on the anchor
         myNode node = myNodeMap.get(index);
@@ -196,8 +207,7 @@ public class MainActivity extends AppCompatActivity {
 
         //add new anchorNode right on top of original anchor --> can then be moved
         AnchorNode anchorNode = new AnchorNode();
-        //anchorNode.setWorldPosition(new Vector3(anchorPosition[0], anchorPosition[1], anchorPosition[2]));
-        anchorNode.setParent(mainAnchorNode);//fragment.getArSceneView().getScene());
+        anchorNode.setParent(mainAnchorNode);
         anchorNode.setLocalPosition(new Vector3(0,0,0));
 
         node.setParent(anchorNode);
@@ -206,49 +216,25 @@ public class MainActivity extends AppCompatActivity {
 
         node.getScaleController().setMinScale(0.2f);
         node.getScaleController().setMaxScale(5f);
-
-        /*
-        node.setOnTouchListener((hitTestResult, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_UP ) {
-                updateFirebase(index);
-            }
-            return true;
-        });
-
-         */
     }
 
 
+    /*
+    iterates through all objects and updates their location, scale and rotation according to the cloud state
+     */
     public void updateObjects() {
         for (int index : myNodeMap.keySet()) {
-            Log.e("INDEX", ((Integer)index).toString());
             NodeData nodeData = sceneData.getNodeData(index);
             myNode node = myNodeMap.get(index);
 
+            // manipulate object
             node.getParent().setLocalPosition(nodeData.getPosition());
-            //Node parent = node.getParent();
-            //node.setParent(null);
             node.setLocalScale(nodeData.getScale());
-            node.getScaleController().onActivated(node); //solves problem?
-            //node.setParent(parent);
-            Log.e("SCALE",nodeData.getScale().toString());
+            node.getScaleController().onActivated(node); // necessary since otherwise original scale remains cached
             node.setLocalRotation(nodeData.getRotation());
         }
 
-
-/*
-        greenAnchorNode = new AnchorNode(anchor);
-        greenAnchorNode.setParent(fragment.getArSceneView().getScene());
-
-
-        Node node = new Node();
-        node.setParent(greenAnchorNode);
-        node.setRenderable(anchorGreenRenderable);
- */
-
     }
-
-
 
 
 
@@ -261,7 +247,9 @@ public class MainActivity extends AppCompatActivity {
         clear();
     }
 
-    // show resolve dialog, ask for CloudAnchor ID, then call onShortCodeEntered
+    /*
+     shows the resolve dialog, asks for short code, then call onShortCodeEntered
+     */
     private void onResolveButtonPressed() {
         ResolveDialogFragment dialog = ResolveDialogFragment.createWithOkListener(
                 this::onShortCodeEntered);;
@@ -269,10 +257,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    /*
+    called when the CloudAnchor has been resolved.
+    It stores the current scene and the newly obtained CloudAnchorID in the cloud state
+     */
     private synchronized void onHostedAnchorAvailable(Anchor anchor) {
         Anchor.CloudAnchorState cloudState = anchor.getCloudAnchorState();
         if (cloudState == Anchor.CloudAnchorState.SUCCESS) {
             String cloudAnchorId = anchor.getCloudAnchorId();
+
+            // store sceneData including cloudAnchorID in database with next available short code
             firebaseManager.nextShortCode(shortCode -> {
                 if (shortCode != null) {
                     sceneData.setCloudAnchorId(cloudAnchorId);
@@ -294,10 +288,6 @@ public class MainActivity extends AppCompatActivity {
                                 anchorLambda -> onResolvedAnchorAvailable(anchorLambda, shortCode));
                     });
 
-
-
-
-
                 } else {
                     // Firebase could not provide a short code.
                     setMessage("Cloud Anchor Hosted, but could not get a short code from Firebase.");
@@ -308,6 +298,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /*
+    called when short code entered in resolve dialog.
+    clears scene and resolves corresponding cloud anchor and its scene
+     */
     private synchronized void onShortCodeEntered(int shortCode) {
         clear();
 
@@ -328,6 +322,11 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    /*
+    called when given short code could be resolved.
+    changes red dot to green.
+
+     */
     private synchronized void onResolvedAnchorAvailable(Anchor anchor, int shortCode) {
         clear();
 
@@ -349,28 +348,17 @@ public class MainActivity extends AppCompatActivity {
             setMessage("Resolved. Short code: " + shortCode);
 
             // sceneData has been set according to newly resolved anchor
-
             myNodeMap = sceneData.getTransformableNodeMap(fragment.getTransformationSystem(), this);
 
+            // initialize local objects according to newly obtained scene information and update them.
             for (int index : myNodeMap.keySet()) {
                 initObject(index);
             }
-
             updateObjects();
-
         } else {
             setMessage("Error while resolving anchor with short code "+shortCode+". Error: " + cloudState.toString());
         }
     }
-
-
-
-
-
-
-
-
-
 
 
 
@@ -380,15 +368,14 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-
-
-
+    /*
+    clear entire scene
+     */
     public void clear(){
         setMessage("cleared");
 
         // clear pending listeners
         cloudAnchorManager.clearListeners();
-        // THROWS CONCURRENT EXCEPTION?!?!
 
         shortCode = 0;
 
@@ -398,7 +385,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // throw away the map
+        // throw away the old map
         myNodeMap = new HashMap<>();
 
         if (mainAnchorNode != null) mainAnchorNode.setParent(null);
@@ -406,23 +393,30 @@ public class MainActivity extends AppCompatActivity {
         anchor = null;
     }
 
+    /*
+    sets a massage to the infoText View.
+     */
     public void setMessage(String message) {
         infoText.setText(message);
     }
 
-    public void updateMessages(TransformableNode node) {
-        setMessage("node loc pos: "+node.getLocalPosition().x+" "+node.getLocalPosition().y+" "+node.getLocalPosition().z);
-        setMessage("anchor node pos: "+node.getParent().getLocalPosition().x+" "+node.getParent().getLocalPosition().y+" "+node.getParent().getLocalPosition().z);
-    }
-
+    /*
+    getter function for short code
+     */
     public int getShortCode() {
         return shortCode;
     }
 
+    /*
+    setter function for short code
+     */
     public void setShortCode(int shortCode) {
         this.shortCode = shortCode;
     }
 
+    /*
+    Updates one specific object in the firebase cloud state.
+     */
     public void updateFirebase(int index){
         if (anchor != null) {
             NodeData nodeData = sceneData.getNodeData(index);

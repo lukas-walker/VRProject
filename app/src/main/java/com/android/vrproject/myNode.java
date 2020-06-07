@@ -9,6 +9,10 @@ import com.google.ar.sceneform.Node;
 import com.google.ar.sceneform.ux.TransformableNode;
 import com.google.ar.sceneform.ux.TransformationSystem;
 
+/*
+Transformable node that can be manipulated.
+Listens for touch events and updates its own state when it changes.
+ */
 public class myNode extends TransformableNode {
     private MainActivity activity;
     private ScaleGestureDetector scaleDetector;

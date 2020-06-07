@@ -15,6 +15,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+
+/*
+Contains all information in the scene
+Provides functions to get and set scene information
+ */
 public class SceneData {
 
     private static final String INDEX_PREFIX= "ID_";
@@ -61,6 +66,9 @@ public class SceneData {
         return myNodeMap;
     }
 
+    /*
+    getter and setter functions necessary for firebase if fields not public
+     */
     public int getIndex(){
         return index;
     }
@@ -69,7 +77,6 @@ public class SceneData {
 
 
     public NodeData getNodeData(int index) {
-
         return nodeDataMap.get(INDEX_PREFIX +  ((Integer)index).toString());
     }
 

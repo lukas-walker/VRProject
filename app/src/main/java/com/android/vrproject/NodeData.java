@@ -4,6 +4,9 @@ import com.google.ar.core.Anchor;
 import com.google.ar.sceneform.math.Quaternion;
 import com.google.ar.sceneform.math.Vector3;
 
+/*
+Contains all information corresponding to one specific object in the scene
+ */
 public class NodeData {
 
     public Vector3 position;

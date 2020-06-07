@@ -15,44 +15,15 @@
  */
 
 package com.android.vrproject;
-
-import android.app.AlertDialog;
 import android.content.Context;
-import android.net.Uri;
 import android.os.Bundle;
-import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.widget.Toast;
-
 import androidx.annotation.Nullable;
-
-import com.google.ar.core.Anchor;
-import com.google.ar.core.Anchor.CloudAnchorState;
 import com.google.ar.core.Config;
-import com.google.ar.core.HitResult;
 import com.google.ar.core.Session;
-import com.google.ar.sceneform.AnchorNode;
-import com.google.ar.sceneform.HitTestResult;
-import com.google.ar.sceneform.Scene;
-import com.google.ar.sceneform.math.Vector3;
-import com.google.ar.sceneform.rendering.Color;
-import com.google.ar.sceneform.rendering.MaterialFactory;
-import com.google.ar.sceneform.rendering.ModelRenderable;
-import com.google.ar.sceneform.rendering.ShapeFactory;
 import com.google.ar.sceneform.ux.ArFragment;
-import com.google.ar.sceneform.ux.TransformableNode;
-
-import java.lang.ref.WeakReference;
-
-import helpers.CloudAnchorManager;
-import helpers.FirebaseManager;
 
 /**
  * Main Fragment for the Cloud Anchors Codelab.

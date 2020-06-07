@@ -16,8 +16,6 @@
 
 package helpers;
 
-import android.util.Log;
-
 import com.google.ar.core.Anchor;
 import com.google.ar.core.Anchor.CloudAnchorState;
 import com.google.ar.core.Session;
